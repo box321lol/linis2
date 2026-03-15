@@ -264,17 +264,28 @@ function saveUrl() {
 
 function fetchData() {
   if (!API_URL) return;
-  fetch(API_URL)
-    .then(function(r) { return r.json(); })
-    .then(function(d) {
-      if (d.error) throw new Error(d.error);
-      students = d.students || {};
-      render();
-      setStatus('ok', '✅ Live · Updated ' + new Date().toLocaleTimeString('en-PH',{hour:'2-digit',minute:'2-digit'}));
-    })
-    .catch(function(e) {
-      setStatus('err', '⚠️ Could not load data: ' + e.message);
-    });
+
+  // Use JSONP to avoid CORS issues with Apps Script
+  var cbName = '__linis_' + Date.now();
+  var old = document.getElementById('__linis_script');
+  if (old) old.remove();
+
+  window[cbName] = function(d) {
+    delete window[cbName];
+    if (d.error) { setStatus('err', '⚠️ Script error: ' + d.error); return; }
+    students = d.students || {};
+    render();
+    setStatus('ok', '✅ Live · Updated ' + new Date().toLocaleTimeString('en-PH',{hour:'2-digit',minute:'2-digit'}));
+  };
+
+  var s = document.createElement('script');
+  s.id  = '__linis_script';
+  s.src = API_URL + '?callback=' + cbName;
+  s.onerror = function() {
+    setStatus('err', '⚠️ Could not reach the Apps Script. Make sure it is deployed as "Anyone" can access.');
+    delete window[cbName];
+  };
+  document.head.appendChild(s);
 }
 
 function render() {
